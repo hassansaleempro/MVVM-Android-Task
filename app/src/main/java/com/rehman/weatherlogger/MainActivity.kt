@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.location.Location
 import android.os.Bundle
 import android.util.Log
+import android.view.View
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
@@ -14,44 +15,65 @@ import androidx.lifecycle.ViewModelProvider
 import com.google.android.gms.location.FusedLocationProviderClient
 import com.google.android.gms.location.LocationServices
 import com.rehman.weatherlogger.databinding.ActivityMainBinding
+import com.rehman.weatherlogger.db.WeatherDataModel
+import com.rehman.weatherlogger.utils.NetworkConnection
 
 class MainActivity : AppCompatActivity() {
 
     private val LOCATION_PERMISSION_REQUEST_CODE = 123
-
     private lateinit var fusedLocationClient: FusedLocationProviderClient
     private lateinit var viewModel: WeatherViewModel
     private var binding: ActivityMainBinding? = null
 
+    private var temperature: String = ""
+    private var timeDate: String = ""
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding!!.root)
-        prepareViewModel()
         fusedLocationClient = LocationServices.getFusedLocationProviderClient(this)
+        prepareViewModel()
         observers()
+        onClickListeners()
+
+
         if (hasLocationPermission()) {
-            // Permission is already granted, proceed with location retrieval
             getUserLocation()
         } else {
-            // Permission is not granted, request it
             requestLocationPermission()
         }
 
 
     }
 
+    private fun prepareViewModel() {
+        viewModel = ViewModelProvider(this)[WeatherViewModel::class.java]
+    }
+
     @SuppressLint("SetTextI18n")
     private fun observers() {
-        viewModel.temp.observe(this) { weatherData ->
-            binding!!.temp.text = "$weatherData° C"
-            Log.wtf("Api_Response", weatherData)
+
+        viewModel.temp.observe(this) { weatherTemp ->
+            temperature = weatherTemp
+            binding!!.weatherTemp.text = getString(R.string.temperature) + " $weatherTemp° C"
+            Log.wtf("Api_Response", weatherTemp)
+        }
+
+        viewModel.date.observe(this) { weatherDate ->
+            timeDate = weatherDate
+            binding!!.fetchDate.text = getString(R.string.date) + " $weatherDate"
+            Log.wtf("Api_Response", weatherDate)
         }
     }
 
-    private fun prepareViewModel() {
-        viewModel = ViewModelProvider(this)[WeatherViewModel::class.java]
+    private fun onClickListeners() {
+        binding!!.saveDate.setOnClickListener {
+            val weatherData = WeatherDataModel(0, temperature, timeDate)
+            viewModel.insertData(weatherData)
+            Log.wtf("Api_Response", "Internet is connected latest data save in db $weatherData")
+
+        }
     }
 
     private fun getUserLocation() {
@@ -111,10 +133,10 @@ class MainActivity : AppCompatActivity() {
                 Manifest.permission.ACCESS_COARSE_LOCATION
             )
         ) {
-            // Show an explanation to the user, then request permission again
+
             showPermissionRationaleDialog()
         } else {
-            // Request permission directly
+
             ActivityCompat.requestPermissions(
                 this,
                 arrayOf(
@@ -157,10 +179,9 @@ class MainActivity : AppCompatActivity() {
                 grantResults[0] == PackageManager.PERMISSION_GRANTED &&
                 grantResults[1] == PackageManager.PERMISSION_GRANTED
             ) {
-                // Permission granted, proceed with location retrieval
                 getUserLocation()
             } else {
-                // Permission denied, handle accordingly
+                showPermissionRationaleDialog()
             }
         }
     }
